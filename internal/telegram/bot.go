@@ -36,6 +36,7 @@ func (b *Bot) Start() error {
 		log.Printf("Callbackquery: %v", update.CallbackQuery)
 
 		if update.CallbackQuery != nil && update.CallbackQuery.Data != "" {
+			chatID := update.CallbackQuery.Message.Chat.ID
 			switch update.CallbackQuery.Data {
 			case "create":
 				//roomID := generateRoomID()
@@ -43,49 +44,48 @@ func (b *Bot) Start() error {
 				if err := b.storage.CreateRoom(roomID); err != nil {
 					return err
 				}
-				if err := b.storage.AssignRoomToUser(roomID, int(update.CallbackQuery.Message.Chat.ID), true); err != nil {
+				if err := b.storage.AssignRoomToUser(roomID, int(chatID), true); err != nil {
 					return err
 				}
 
 				replyText := fmt.Sprintf("Вот ваш roomID: %s\n скиньте его другим игрокам", strconv.Itoa(roomID))
-				replyMsg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, replyText)
+				replyMsg := tgbotapi.NewMessage(chatID, replyText)
 				_, err := b.bot.Send(replyMsg)
 				if err != nil {
 					return err
 				}
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Что вы хотите получить в качестве подарка?")
+				msg := tgbotapi.NewMessage(chatID, "Что вы хотите получить в качестве подарка?")
 				_, err = b.bot.Send(msg)
 				if err != nil {
 					return err
 				}
-				b.StateKeeper.update(int(update.CallbackQuery.Message.Chat.ID), "wishlist")
+				b.StateKeeper.update(int(chatID), "wishlist")
 			case "enterRoomID":
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Введите roomID")
+				msg := tgbotapi.NewMessage(chatID, "Введите roomID")
 				_, err := b.bot.Send(msg)
 				if err != nil {
 					return err
 				}
-				b.StateKeeper.update(int(update.CallbackQuery.Message.Chat.ID), "join")
+				b.StateKeeper.update(int(chatID), "join")
 			case "showPlayers":
-				rooms, err := b.storage.RoomsWhereUserIsOrg(int(update.CallbackQuery.Message.Chat.ID))
+				room, err := b.storage.RoomWhereUserIsOrg(int(chatID))
 				if err != nil {
 					return err
 				}
-				roomUsers, err := b.storage.UsersFromRoom(rooms[0])
+				roomUsers, err := b.storage.UsersFromRoom(room)
 				if err != nil {
 					return err
 				}
 				text := "Участники: \n\n"
 				for i, user := range roomUsers {
-					if int64(user.ID) == update.CallbackQuery.Message.Chat.ID {
+					if int64(user.ID) == chatID {
 						continue
 					}
 					text += fmt.Sprintf("%d. %s %s\n", i, user.Firstname, user.Lastname)
 				}
-				msgToOrg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, text)
-				distrBtn := tgbotapi.NewInlineKeyboardButtonData("Распределить", "distribute")
+				msgToOrg := tgbotapi.NewMessage(chatID, text)
 				btns := []tgbotapi.InlineKeyboardButton{
-					distrBtn,
+					tgbotapi.NewInlineKeyboardButtonData("Распределить", "distribute"),
 				}
 				k := tgbotapi.NewInlineKeyboardMarkup(btns)
 				msgToOrg.ReplyMarkup = k
@@ -95,36 +95,30 @@ func (b *Bot) Start() error {
 					return err
 				}
 			case "distribute":
-				// смотрим, в каких группах юзер - организатор
-				rooms, err := b.storage.RoomsWhereUserIsOrg(int(update.CallbackQuery.Message.Chat.ID))
+				// смотрим, в какой комнате юзер является организатором
+				roomID, err := b.storage.RoomWhereUserIsOrg(int(chatID))
 				if err != nil {
 					return err
 				}
-				// TODO: если групп >1, спршиваем, про какую идет речь
-				// после выбора группы, находим всех ее участников и перемешиваем
-				var roomID int
-				if len(rooms) != 0 {
-					roomID = rooms[0]
-					roomUsers, err := b.storage.UsersFromRoom(roomID)
-					if err != nil {
-						return err
-					}
-					if len(roomUsers) > 2 {
-						shuffledUsers := shuffleUsers(roomUsers)
-						log.Printf("shuffledUsers: %v", shuffledUsers)
-						for giver, getter := range shuffledUsers {
-							msgToGiver := tgbotapi.NewMessage(int64(giver.ID), fmt.Sprintf("Вы дарите подарок %s", getter.Username))
-							_, err = b.bot.Send(msgToGiver)
-							if err != nil {
-								return err
-							}
-						}
-					} else {
-						msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "В комнате недостаточно игроков")
-						_, err = b.bot.Send(msg)
+				roomUsers, err := b.storage.UsersFromRoom(roomID)
+				if err != nil {
+					return err
+				}
+				if len(roomUsers) > 2 {
+					shuffledUsers := shuffleUsers(roomUsers)
+					log.Printf("shuffledUsers: %v", shuffledUsers)
+					for giver, getter := range shuffledUsers {
+						msgToGiver := tgbotapi.NewMessage(int64(giver.ID), fmt.Sprintf("Вы дарите подарок %s", getter.Username))
+						_, err = b.bot.Send(msgToGiver)
 						if err != nil {
 							return err
 						}
+					}
+				} else {
+					msg := tgbotapi.NewMessage(chatID, "В комнате недостаточно игроков")
+					_, err = b.bot.Send(msg)
+					if err != nil {
+						return err
 					}
 				}
 			}

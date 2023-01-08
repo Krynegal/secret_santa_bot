@@ -54,28 +54,30 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	case "wishlist":
 		log.Printf("wishlist: %v", msg.Text)
 		// пишем msg.Text в БД
+		// нужно хранить roomID
+		//if err := b.storage.AddWish(int(message.Chat.ID), msg.Text); err != nil {
+		//	return err
+		//}
 
-		rooms, err := b.storage.RoomsWhereUserIsOrg(int(message.Chat.ID))
-		if err != nil {
-			return err
-		}
-		if len(rooms) != 0 {
-			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Супер! Теперь ждем остальных участников")
-			btns := []tgbotapi.InlineKeyboardButton{
-				tgbotapi.NewInlineKeyboardButtonData("Показать участников", "showPlayers"),
-			}
-			k := tgbotapi.NewInlineKeyboardMarkup(btns)
-			replyMsg.ReplyMarkup = k
-			_, err = b.bot.Send(replyMsg)
-			if err != nil {
-				return err
-			}
-		} else {
+		_, err := b.storage.RoomWhereUserIsOrg(int(message.Chat.ID))
+		if err == storage.UserIsNotOrg {
 			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Отлично! Теперь ждем, когда организатор начнет игру!")
 			_, err = b.bot.Send(replyMsg)
 			if err != nil {
 				return err
 			}
+		} else if err != nil {
+			return err
+		}
+		replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Супер! Теперь ждем остальных участников")
+		btns := []tgbotapi.InlineKeyboardButton{
+			tgbotapi.NewInlineKeyboardButtonData("Показать участников", "showPlayers"),
+		}
+		k := tgbotapi.NewInlineKeyboardMarkup(btns)
+		replyMsg.ReplyMarkup = k
+		_, err = b.bot.Send(replyMsg)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -118,11 +120,9 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 	}
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Добро пожаловать в Тайного Санту")
-	b1 := tgbotapi.NewInlineKeyboardButtonData("Создать", "create")
-	b2 := tgbotapi.NewInlineKeyboardButtonData("Присоединиться", "enterRoomID")
 	btns := []tgbotapi.InlineKeyboardButton{
-		b1,
-		b2,
+		tgbotapi.NewInlineKeyboardButtonData("Создать", "create"),
+		tgbotapi.NewInlineKeyboardButtonData("Присоединиться", "enterRoomID"),
 	}
 	k := tgbotapi.NewInlineKeyboardMarkup(btns)
 	msg.ReplyMarkup = k

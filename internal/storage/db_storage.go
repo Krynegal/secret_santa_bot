@@ -52,14 +52,25 @@ func (db *DB) CreateRoom(roomID int) error {
 	return nil
 }
 
+func (db *DB) AddWish(roomID, userID int, wish string) error {
+	_, err := db.db.Exec("INSERT INTO id_room_id_user (wishlist) VALUES ($1) WHERE id_room = ($2) AND id_room = ($3);", wish, userID, roomID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (db *DB) AssignRoomToUser(roomID, userID int, isOrganizer bool) error {
 	row := db.db.QueryRow(`SELECT EXISTS(SELECT * FROM id_room_id_user WHERE id_user = ($1) AND id_room = ($2));`, userID, roomID)
 	var isExist bool
-	_ = row.Scan(&isExist)
-	if isExist {
-		return RoomUserPairExists
+	err := row.Scan(&isExist)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return RoomUserPairExists
+		}
+		return err
 	}
-	_, err := db.db.Exec("INSERT INTO id_room_id_user VALUES ($1, $2, $3);", roomID, userID, isOrganizer)
+	_, err = db.db.Exec("INSERT INTO id_room_id_user VALUES ($1, $2, $3);", roomID, userID, isOrganizer)
 	if err != nil {
 		return err
 	}
@@ -74,6 +85,7 @@ func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	defer func() {
 		cerr := rows.Close()
 		if cerr != nil {
@@ -92,28 +104,18 @@ func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
 	return users, nil
 }
 
-func (db *DB) RoomsWhereUserIsOrg(userID int) ([]int, error) {
-	rows, err := db.db.Query(`SELECT room_id FROM rooms
+func (db *DB) RoomWhereUserIsOrg(userID int) (int, error) {
+	row := db.db.QueryRow(`SELECT room_id FROM rooms
 		JOIN id_room_id_user ON id_room_id_user.id_room = rooms.room_id
 		JOIN users ON id_room_id_user.id_user = users.user_id
 		WHERE user_id = ($1) AND id_room_id_user.organizer = true;`, userID)
+	var roomID int
+	err := row.Scan(&roomID)
 	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		cerr := rows.Close()
-		if cerr != nil {
-			err = cerr
+		if err == sql.ErrNoRows {
+			return -1, UserIsNotOrg
 		}
-	}()
-
-	var roomIDs []int
-	for rows.Next() {
-		var roomID int
-		if err = rows.Scan(&roomID); err != nil {
-			return nil, err
-		}
-		roomIDs = append(roomIDs, roomID)
+		return -1, err
 	}
-	return roomIDs, nil
+	return roomID, nil
 }

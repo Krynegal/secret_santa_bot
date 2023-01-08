@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	RoomUserPairExists = errors.New("Room with this user is already exist")
+	RoomUserPairExists = errors.New("room with this user is already exist")
+	UserIsNotOrg       = errors.New("there are no rooms where user is an organizer")
 )
 
 type Storager interface {
@@ -15,7 +16,8 @@ type Storager interface {
 	CreateRoom(roomID int) error
 	AssignRoomToUser(roomID, userID int, isOrganizer bool) error
 	UsersFromRoom(roomID int) ([]models.User, error)
-	RoomsWhereUserIsOrg(userID int) ([]int, error)
+	RoomWhereUserIsOrg(userID int) (int, error)
+	AddWish(roomID, userID int, wish string) error
 }
 
 func NewStorage(cfg *configs.Config) (Storager, error) {
