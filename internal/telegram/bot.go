@@ -33,7 +33,7 @@ func (b *Bot) Start() error {
 	updates := b.bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		log.Println(update.CallbackQuery)
+		log.Printf("Callbackquery: %v", update.CallbackQuery)
 		if update.Message == nil { // ignore any non-Message Updates
 			continue
 		}

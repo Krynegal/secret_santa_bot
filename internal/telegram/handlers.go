@@ -29,6 +29,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
 
+	if message.Text == "Распределить" {
+		b.StateKeeper.update(int(message.From.ID), "Распределить")
+	}
+
 	state := b.StateKeeper.state(int(message.From.ID))
 	log.Printf("\nstate: %s\n", state)
 
@@ -37,30 +41,23 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		log.Printf("\nmsg.Text: %s\n", msg.Text)
 		if msg.Text == "Создать" {
 			roomID := generateRoomID()
+			//roomID := 1234
 			if err := b.storage.CreateRoom(roomID); err != nil {
 				return err
 			}
 			if err := b.storage.AssignRoomToUser(roomID, int(message.Chat.ID), true); err != nil {
 				return err
 			}
-			replyText := fmt.Sprintf("Вот ваш roomID: %s", strconv.Itoa(roomID))
+			replyText := fmt.Sprintf("Вот ваш roomID: %s\n скиньте его другим игрокам", strconv.Itoa(roomID))
 			replyMsg := tgbotapi.NewMessage(message.Chat.ID, replyText)
-			buttons := []tgbotapi.KeyboardButton{
-				tgbotapi.NewKeyboardButton("Распределить"),
-			}
-			keyboard := tgbotapi.NewReplyKeyboard(buttons)
 
-			//var keyboard = tgbotapi.NewInlineKeyboardMarkup(
-			//	tgbotapi.NewInlineKeyboardRow(
-			//		tgbotapi.NewInlineKeyboardButtonData("Распределить", "distribute"),
-			//	),
-			//)
-
-			replyMsg.ReplyMarkup = keyboard
 			_, err := b.bot.Send(replyMsg)
 			if err != nil {
 				return err
 			}
+
+			msg.Text = "Что вы хотите получить в качестве подарка?"
+			b.StateKeeper.update(int(message.From.ID), "wishlist")
 		} else {
 			msg.Text = "Введите roomID"
 			b.StateKeeper.update(int(message.From.ID), "join")
@@ -89,12 +86,34 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		}
 		log.Printf("roomUsers: %v", roomUsers)
 		for _, user := range roomUsers {
-			if int(message.Chat.ID) == user.ChatID {
+			if int(message.Chat.ID) == user.ID {
 				continue
 			}
-			msgToOrg := tgbotapi.NewMessage(int64(user.ChatID), message.Text)
+			msgToOrg := tgbotapi.NewMessage(int64(user.ID), message.Text)
 			msgToOrg.Text = fmt.Sprintf("новое подключение: %s", message.From.FirstName)
 			_, err = b.bot.Send(msgToOrg)
+			if err != nil {
+				return err
+			}
+		}
+		msg.Text = "Что вы хотите получить в качестве подарка?"
+		b.StateKeeper.update(int(message.From.ID), "wishlist")
+	case "wishlist":
+		log.Printf("wishlist: %v", msg.Text)
+		// пишем msg.Text в БД
+
+		rooms, err := b.storage.RoomsWhereUserIsOrg(int(message.Chat.ID))
+		if err != nil {
+			return err
+		}
+		if len(rooms) != 0 {
+			replyMsg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
+			buttons := []tgbotapi.KeyboardButton{
+				tgbotapi.NewKeyboardButton("Распределить"),
+			}
+			keyboard := tgbotapi.NewReplyKeyboard(buttons)
+			replyMsg.ReplyMarkup = keyboard
+			_, err := b.bot.Send(replyMsg)
 			if err != nil {
 				return err
 			}
@@ -116,28 +135,20 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			}
 			if len(roomUsers) > 2 {
 				shuffledUsers := shuffleUsers(roomUsers)
+				log.Printf("shuffledUsers: %v", shuffledUsers)
 				for giver, getter := range shuffledUsers {
-					msgToGiver := tgbotapi.NewMessage(int64(giver.ChatID), message.Text)
+					msgToGiver := tgbotapi.NewMessage(int64(giver.ID), message.Text)
 					msgToGiver.Text = fmt.Sprintf("Вы дарите подарок %s", getter.Username)
-					_, err = b.bot.Send(msgToGiver)
-					if err != nil {
-						return err
-					}
+					//_, err = b.bot.Send(msgToGiver)
+					//if err != nil {
+					//	return err
+					//}
 				}
 			} else {
-				msg.Text = "В комнате недостаточно игроков("
-				_, err = b.bot.Send(msg)
-				if err != nil {
-					return err
-				}
+				msg.Text = "В комнате недостаточно игроков"
 			}
-
 		} else {
 			msg.Text = "Вы не являетесь организатором ни одной группы"
-			_, err = b.bot.Send(msg)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
@@ -170,7 +181,6 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 
 	user := models.User{
 		ID:        int(message.Chat.ID),
-		ChatID:    int(message.Chat.ID),
 		Firstname: message.From.FirstName,
 		Lastname:  message.From.LastName,
 		Username:  message.From.UserName,
@@ -188,6 +198,7 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 		btnJoin,
 	}
 	keyboard := tgbotapi.NewReplyKeyboard(buttons)
+
 	msg.ReplyMarkup = keyboard
 
 	b.StateKeeper.update(int(message.From.ID), "main")

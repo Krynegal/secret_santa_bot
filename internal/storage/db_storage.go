@@ -29,9 +29,8 @@ func NewDatabaseStorage(dsn string) (DBStorager, error) {
 }
 
 func (db *DB) AddUser(user models.User) error {
-	_, err := db.db.Exec("INSERT INTO users VALUES ($1,$2,$3,$4,$5);",
+	_, err := db.db.Exec("INSERT INTO users VALUES ($1,$2,$3,$4);",
 		user.ID,
-		user.ChatID,
 		user.Firstname,
 		user.Lastname,
 		user.Username,
@@ -68,7 +67,7 @@ func (db *DB) AssignRoomToUser(roomID, userID int, isOrganizer bool) error {
 }
 
 func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
-	rows, err := db.db.Query(`SELECT users.user_id, users.chat_id, users.firstname, users.lastname, users.username FROM users
+	rows, err := db.db.Query(`SELECT users.user_id, users.firstname, users.lastname, users.username FROM users
 		JOIN id_room_id_user ON id_room_id_user.id_user = users.user_id
 		JOIN rooms ON id_room_id_user.id_room = rooms.room_id
 		WHERE room_id = ($1);`, roomID)
@@ -85,7 +84,7 @@ func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err = rows.Scan(&user.ID, &user.ChatID, &user.Firstname, &user.Lastname, &user.Username); err != nil {
+		if err = rows.Scan(&user.ID, &user.Firstname, &user.Lastname, &user.Username); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -95,8 +94,8 @@ func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
 
 func (db *DB) RoomsWhereUserIsOrg(userID int) ([]int, error) {
 	rows, err := db.db.Query(`SELECT room_id FROM rooms
-		JOIN id_room_id_user ON id_room_id_user.id_user = users.user_id
-		JOIN rooms ON id_room_id_user.id_room = rooms.room_id
+		JOIN id_room_id_user ON id_room_id_user.id_room = rooms.room_id
+		JOIN users ON id_room_id_user.id_user = users.user_id
 		WHERE user_id = ($1) AND id_room_id_user.organizer = true;`, userID)
 	if err != nil {
 		return nil, err
