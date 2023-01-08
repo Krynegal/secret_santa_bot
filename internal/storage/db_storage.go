@@ -67,7 +67,7 @@ func (db *DB) AssignRoomToUser(roomID, userID int, isOrganizer bool) error {
 }
 
 func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
-	rows, err := db.db.Query(`SELECT users.user_id, users.firstname, users.lastname, users.username FROM users
+	rows, err := db.db.Query(`SELECT users.user_id, users.firstname, users.lastname, users.username, id_room_id_user.organizer FROM users
 		JOIN id_room_id_user ON id_room_id_user.id_user = users.user_id
 		JOIN rooms ON id_room_id_user.id_room = rooms.room_id
 		WHERE room_id = ($1);`, roomID)
@@ -84,7 +84,7 @@ func (db *DB) UsersFromRoom(roomID int) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err = rows.Scan(&user.ID, &user.Firstname, &user.Lastname, &user.Username); err != nil {
+		if err = rows.Scan(&user.ID, &user.Firstname, &user.Lastname, &user.Username, &user.Organizer); err != nil {
 			return nil, err
 		}
 		users = append(users, user)

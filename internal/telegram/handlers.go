@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"errors"
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
 	"math/rand"
@@ -29,39 +28,10 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
 
-	if message.Text == "Распределить" {
-		b.StateKeeper.update(int(message.From.ID), "Распределить")
-	}
-
 	state := b.StateKeeper.state(int(message.From.ID))
 	log.Printf("\nstate: %s\n", state)
 
 	switch state {
-	case "main":
-		log.Printf("\nmsg.Text: %s\n", msg.Text)
-		if msg.Text == "Создать" {
-			roomID := generateRoomID()
-			//roomID := 1234
-			if err := b.storage.CreateRoom(roomID); err != nil {
-				return err
-			}
-			if err := b.storage.AssignRoomToUser(roomID, int(message.Chat.ID), true); err != nil {
-				return err
-			}
-			replyText := fmt.Sprintf("Вот ваш roomID: %s\n скиньте его другим игрокам", strconv.Itoa(roomID))
-			replyMsg := tgbotapi.NewMessage(message.Chat.ID, replyText)
-
-			_, err := b.bot.Send(replyMsg)
-			if err != nil {
-				return err
-			}
-
-			msg.Text = "Что вы хотите получить в качестве подарка?"
-			b.StateKeeper.update(int(message.From.ID), "wishlist")
-		} else {
-			msg.Text = "Введите roomID"
-			b.StateKeeper.update(int(message.From.ID), "join")
-		}
 	case "join":
 		log.Printf("entered roomID: %s", msg.Text)
 		keyboard := tgbotapi.NewRemoveKeyboard(true)
@@ -79,23 +49,6 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			}
 			return err
 		}
-
-		roomUsers, err := b.storage.UsersFromRoom(roomID)
-		if err != nil {
-			return err
-		}
-		log.Printf("roomUsers: %v", roomUsers)
-		for _, user := range roomUsers {
-			if int(message.Chat.ID) == user.ID {
-				continue
-			}
-			msgToOrg := tgbotapi.NewMessage(int64(user.ID), message.Text)
-			msgToOrg.Text = fmt.Sprintf("новое подключение: %s", message.From.FirstName)
-			_, err = b.bot.Send(msgToOrg)
-			if err != nil {
-				return err
-			}
-		}
 		msg.Text = "Что вы хотите получить в качестве подарка?"
 		b.StateKeeper.update(int(message.From.ID), "wishlist")
 	case "wishlist":
@@ -107,48 +60,22 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			return err
 		}
 		if len(rooms) != 0 {
-			replyMsg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
-			buttons := []tgbotapi.KeyboardButton{
-				tgbotapi.NewKeyboardButton("Распределить"),
+			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Супер! Теперь ждем остальных участников")
+			btns := []tgbotapi.InlineKeyboardButton{
+				tgbotapi.NewInlineKeyboardButtonData("Показать участников", "showPlayers"),
 			}
-			keyboard := tgbotapi.NewReplyKeyboard(buttons)
-			replyMsg.ReplyMarkup = keyboard
-			_, err := b.bot.Send(replyMsg)
+			k := tgbotapi.NewInlineKeyboardMarkup(btns)
+			replyMsg.ReplyMarkup = k
+			_, err = b.bot.Send(replyMsg)
 			if err != nil {
 				return err
-			}
-		}
-	case "Распределить":
-		// смотрим, в каких группах юзер - организатор
-		rooms, err := b.storage.RoomsWhereUserIsOrg(int(message.Chat.ID))
-		if err != nil {
-			return err
-		}
-		// TODO: если групп >1, спршиваем, про какую идет речь
-		// после выбора группы, находим всех ее участников и перемешиваем
-		var roomID int
-		if len(rooms) != 0 {
-			roomID = rooms[0]
-			roomUsers, err := b.storage.UsersFromRoom(roomID)
-			if err != nil {
-				return err
-			}
-			if len(roomUsers) > 2 {
-				shuffledUsers := shuffleUsers(roomUsers)
-				log.Printf("shuffledUsers: %v", shuffledUsers)
-				for giver, getter := range shuffledUsers {
-					msgToGiver := tgbotapi.NewMessage(int64(giver.ID), message.Text)
-					msgToGiver.Text = fmt.Sprintf("Вы дарите подарок %s", getter.Username)
-					//_, err = b.bot.Send(msgToGiver)
-					//if err != nil {
-					//	return err
-					//}
-				}
-			} else {
-				msg.Text = "В комнате недостаточно игроков"
 			}
 		} else {
-			msg.Text = "Вы не являетесь организатором ни одной группы"
+			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Отлично! Теперь ждем, когда организатор начнет игру!")
+			_, err = b.bot.Send(replyMsg)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -191,17 +118,15 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 	}
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Добро пожаловать в Тайного Санту")
-	btnCreate := tgbotapi.NewKeyboardButton("Создать")
-	btnJoin := tgbotapi.NewKeyboardButton("Присоединиться")
-	buttons := []tgbotapi.KeyboardButton{
-		btnCreate,
-		btnJoin,
+	b1 := tgbotapi.NewInlineKeyboardButtonData("Создать", "create")
+	b2 := tgbotapi.NewInlineKeyboardButtonData("Присоединиться", "enterRoomID")
+	btns := []tgbotapi.InlineKeyboardButton{
+		b1,
+		b2,
 	}
-	keyboard := tgbotapi.NewReplyKeyboard(buttons)
+	k := tgbotapi.NewInlineKeyboardMarkup(btns)
+	msg.ReplyMarkup = k
 
-	msg.ReplyMarkup = keyboard
-
-	b.StateKeeper.update(int(message.From.ID), "main")
 	_, err := b.bot.Send(msg)
 	return err
 }
