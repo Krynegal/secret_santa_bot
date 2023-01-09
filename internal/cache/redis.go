@@ -43,7 +43,7 @@ func (c *cache) AddUser(ctx context.Context, userID int, value models.CacheNote)
 	return c.client.Set(ctx, uid, buffer.Bytes(), 0).Err()
 }
 
-func (c *cache) State(ctx context.Context, userID int) (models.CacheNote, error) {
+func (c *cache) User(ctx context.Context, userID int) (models.CacheNote, error) {
 	uid := strconv.Itoa(userID)
 	cmd := c.client.Get(ctx, uid)
 	cmdb, err := cmd.Bytes()
@@ -60,13 +60,13 @@ func (c *cache) State(ctx context.Context, userID int) (models.CacheNote, error)
 
 func (c *cache) UpdateState(ctx context.Context, userID int, state string) error {
 	uid := strconv.Itoa(userID)
-	cacheNote, err := c.State(ctx, userID)
+	user, err := c.User(ctx, userID)
 	if err != nil {
 		return err
 	}
-	cacheNote.State = state
+	user.State = state
 	var buffer bytes.Buffer
-	if err = json.NewEncoder(&buffer).Encode(cacheNote); err != nil {
+	if err = json.NewEncoder(&buffer).Encode(user); err != nil {
 		return err
 	}
 	if err = c.client.Set(ctx, uid, buffer.Bytes(), 0).Err(); err != nil {

@@ -180,13 +180,13 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 
 	//state := b.StateKeeper.state(int(message.From.ID))
 	ctx := context.Background()
-	note, err := b.cache.State(ctx, int(message.From.ID))
+	user, err := b.cache.User(ctx, int(message.From.ID))
 	if err != nil {
 		return err
 	}
-	log.Printf("\nstate: %s\n", note.State)
+	log.Printf("\nstate: %s\n", user.State)
 
-	switch note.State {
+	switch user.State {
 	case "join":
 		log.Printf("entered roomID: %s", msg.Text)
 		keyboard := tgbotapi.NewRemoveKeyboard(true)
@@ -212,11 +212,14 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		}
 	case "wishlist":
 		log.Printf("wishlist: %v", msg.Text)
-		// пишем msg.Text в БД
-		// нужно хранить roomID
-		//if err := b.storage.AddWish(int(message.Chat.ID), msg.Text); err != nil {
-		//	return err
-		//}
+		ctx = context.Background()
+		user, err = b.cache.User(ctx, int(message.Chat.ID))
+		if err != nil {
+			return err
+		}
+		if err = b.storage.AddWish(user.RoomID, int(message.Chat.ID), msg.Text); err != nil {
+			return err
+		}
 
 		//_, err = b.storage.RoomWhereUserIsOrg(int(message.Chat.ID))
 		ctx = context.Background()
@@ -225,6 +228,7 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			return err
 		}
 		log.Printf("\nroom: %v\n", room)
+		// TODO: room должен быть -1, если юзер не организатор комнаты
 		if room == 0 {
 			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Отлично! Теперь ждем, когда организатор начнет игру!")
 			_, err = b.bot.Send(replyMsg)
