@@ -11,3 +11,9 @@ type User struct {
 type Room struct {
 	id int
 }
+
+type CacheNote struct {
+	RoomID      int
+	State       string
+	IsOrganizer bool
+}

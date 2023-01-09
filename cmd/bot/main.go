@@ -3,6 +3,7 @@ package main
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"secretSanta/internal/cache"
 	"secretSanta/internal/configs"
 	"secretSanta/internal/storage"
 	"secretSanta/internal/telegram"
@@ -16,12 +17,17 @@ func main() {
 	}
 	botApi.Debug = true
 
-	strg, err := storage.NewStorage(cfg)
+	s, err := storage.NewStorage(cfg)
 	if err != nil {
 		panic("Can not create the storage")
 	}
 
-	bot := telegram.NewBot(botApi, strg)
+	c, err := cache.New(cfg)
+	if err != nil {
+		panic("Can not create the cache")
+	}
+
+	bot := telegram.NewBot(botApi, s, c)
 	if err = bot.Start(); err != nil {
 		log.Fatal(err)
 	}

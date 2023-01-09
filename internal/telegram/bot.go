@@ -4,24 +4,21 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"secretSanta/internal/cache"
 	"secretSanta/internal/storage"
-	"sync"
 )
 
 type Bot struct {
-	bot         *tgbotapi.BotAPI
-	storage     storage.Storager
-	StateKeeper StateKeeper
+	bot     *tgbotapi.BotAPI
+	storage storage.Storager
+	cache   cache.Cache
 }
 
-func NewBot(bot *tgbotapi.BotAPI, storage storage.Storager) *Bot {
+func NewBot(bot *tgbotapi.BotAPI, storage storage.Storager, cache cache.Cache) *Bot {
 	return &Bot{
 		bot:     bot,
 		storage: storage,
-		StateKeeper: StateKeeper{
-			mu:     sync.RWMutex{},
-			states: map[int]string{},
-		},
+		cache:   cache,
 	}
 }
 
