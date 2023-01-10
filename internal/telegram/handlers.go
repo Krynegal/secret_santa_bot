@@ -100,9 +100,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 					return err
 				}
 				text := fmt.Sprintf("Вы дарите подарок: %s\n\nВот что было написано в пожелании к подарку:\n%s", getter.Username, wishlist)
-				msgToGiver := tgbotapi.NewMessage(int64(giver.ID), text)
-				if _, err = b.bot.Send(msgToGiver); err != nil {
-					return err
+				if giver.ID == 966098933 || giver.ID == 253141599 {
+					msgToGiver := tgbotapi.NewMessage(int64(giver.ID), text)
+					if _, err = b.bot.Send(msgToGiver); err != nil {
+						return err
+					}
 				}
 			}
 		} else {

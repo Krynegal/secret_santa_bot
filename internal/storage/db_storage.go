@@ -61,7 +61,7 @@ func (db *DB) AddWish(roomID, userID int, wish string) error {
 }
 
 func (db *DB) Wish(roomID, userID int) (string, error) {
-	row := db.db.QueryRow(`SELECT id_room_id_user.wishlist FROM id_room_id_user WHERE id_user = ($1) AND id_room = ($2));`, userID, roomID)
+	row := db.db.QueryRow(`SELECT wishlist FROM id_room_id_user WHERE id_user = $1 AND id_room = $2;`, userID, roomID)
 	var wish string
 	err := row.Scan(&wish)
 	if err != nil {
