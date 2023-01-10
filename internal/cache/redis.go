@@ -91,29 +91,3 @@ func (c *cache) RoomWhereUserIsOrg(ctx context.Context, userID int) (int, error)
 	}
 	return res.RoomID, nil
 }
-
-//func (c *cache) SetUser(ctx context.Context, user models.User) error {
-//	var buffer bytes.Buffer
-//	if err := json.NewEncoder(&buffer).Encode(user); err != nil {
-//		return err
-//	}
-//	uid := strconv.Itoa(user.ID)
-//	return c.client.Set(ctx, uid, buffer.Bytes(), 0).Err()
-//}
-//
-//func (c *cache) User(ctx context.Context, uid int) (models.User, error) {
-//	id := strconv.Itoa(uid)
-//	cmd := c.client.Get(ctx, id)
-//
-//	cmdb, err := cmd.Bytes()
-//	if err != nil {
-//		return models.User{}, err
-//	}
-//
-//	b := bytes.NewReader(cmdb)
-//	var res models.User
-//	if err = json.NewDecoder(b).Decode(&res); err != nil {
-//		return models.User{}, err
-//	}
-//	return res, nil
-//}

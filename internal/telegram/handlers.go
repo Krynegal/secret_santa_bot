@@ -32,17 +32,14 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 
 		replyText := fmt.Sprintf("Вот ваш roomID: %s\n скиньте его другим игрокам", strconv.Itoa(roomID))
 		replyMsg := tgbotapi.NewMessage(chatID, replyText)
-		_, err := b.bot.Send(replyMsg)
-		if err != nil {
+		if _, err := b.bot.Send(replyMsg); err != nil {
 			return err
 		}
 		msg := tgbotapi.NewMessage(chatID, "Что вы хотите получить в качестве подарка?")
-		_, err = b.bot.Send(msg)
-		if err != nil {
+		if _, err := b.bot.Send(msg); err != nil {
 			return err
 		}
-		//b.StateKeeper.update(int(chatID), "wishlist")
-		if err = b.cache.UpdateState(ctx, int(chatID), "wishlist"); err != nil {
+		if err := b.cache.UpdateState(ctx, int(chatID), "wishlist"); err != nil {
 			return err
 		}
 	case "enterRoomID":
@@ -51,13 +48,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		if err != nil {
 			return err
 		}
-		//b.StateKeeper.update(int(chatID), "join")
 		ctx := context.Background()
 		if err = b.cache.UpdateState(ctx, int(chatID), "join"); err != nil {
 			return err
 		}
 	case "showPlayers":
-		//room, err := b.storage.RoomWhereUserIsOrg(int(chatID))
 		ctx := context.Background()
 		roomID, err := b.cache.RoomWhereUserIsOrg(ctx, int(chatID))
 		if err != nil {
@@ -81,16 +76,12 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 		btns := []tgbotapi.InlineKeyboardButton{
 			tgbotapi.NewInlineKeyboardButtonData("Распределить", "distribute"),
 		}
-		k := tgbotapi.NewInlineKeyboardMarkup(btns)
-		msgToOrg.ReplyMarkup = k
+		msgToOrg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(btns)
 
-		_, err = b.bot.Send(msgToOrg)
-		if err != nil {
+		if _, err = b.bot.Send(msgToOrg); err != nil {
 			return err
 		}
 	case "distribute":
-		// смотрим, в какой комнате юзер является организатором
-		// roomID, err := b.storage.RoomWhereUserIsOrg(int(chatID))
 		ctx := context.Background()
 		roomID, err := b.cache.RoomWhereUserIsOrg(ctx, int(chatID))
 		if err != nil {
@@ -104,16 +95,19 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 			shuffledUsers := shuffleUsers(roomUsers)
 			log.Printf("shuffledUsers: %v", shuffledUsers)
 			for giver, getter := range shuffledUsers {
-				msgToGiver := tgbotapi.NewMessage(int64(giver.ID), fmt.Sprintf("Вы дарите подарок %s", getter.Username))
-				_, err = b.bot.Send(msgToGiver)
+				wishlist, err := b.storage.Wish(roomID, getter.ID)
 				if err != nil {
+					return err
+				}
+				text := fmt.Sprintf("Вы дарите подарок: %s\n\nВот что было написано в пожелании к подарку:\n%s", getter.Username, wishlist)
+				msgToGiver := tgbotapi.NewMessage(int64(giver.ID), text)
+				if _, err = b.bot.Send(msgToGiver); err != nil {
 					return err
 				}
 			}
 		} else {
 			msg := tgbotapi.NewMessage(chatID, "В комнате недостаточно игроков")
-			_, err = b.bot.Send(msg)
-			if err != nil {
+			if _, err = b.bot.Send(msg); err != nil {
 				return err
 			}
 		}
@@ -159,9 +153,7 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 		tgbotapi.NewInlineKeyboardButtonData("Создать", "create"),
 		tgbotapi.NewInlineKeyboardButtonData("Присоединиться", "enterRoomID"),
 	}
-	k := tgbotapi.NewInlineKeyboardMarkup(btns)
-	msg.ReplyMarkup = k
-
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(btns)
 	_, err := b.bot.Send(msg)
 	return err
 }
@@ -178,7 +170,6 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 	log.Printf("[%s] %s", message.From.UserName, message.Text)
 	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
 
-	//state := b.StateKeeper.state(int(message.From.ID))
 	ctx := context.Background()
 	user, err := b.cache.User(ctx, int(message.From.ID))
 	if err != nil {
@@ -196,6 +187,9 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			return err
 		}
 
+		if err := b.cache.AddUser(ctx, int(message.Chat.ID), models.CacheNote{RoomID: roomID, IsOrganizer: false}); err != nil {
+			return err
+		}
 		err = b.storage.AssignRoomToUser(roomID, int(message.Chat.ID), false)
 		if err != nil {
 			if errors.Is(err, storage.RoomUserPairExists) {
@@ -205,13 +199,12 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			return err
 		}
 		msg.Text = "Что вы хотите получить в качестве подарка?"
-		//b.StateKeeper.update(int(message.From.ID), "wishlist")
 		ctx = context.Background()
 		if err = b.cache.UpdateState(ctx, int(message.From.ID), "wishlist"); err != nil {
 			return err
 		}
 	case "wishlist":
-		log.Printf("wishlist: %v", msg.Text)
+		log.Printf("\nuserID: %d\n", message.Chat.ID)
 		ctx = context.Background()
 		user, err = b.cache.User(ctx, int(message.Chat.ID))
 		if err != nil {
@@ -221,18 +214,15 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			return err
 		}
 
-		//_, err = b.storage.RoomWhereUserIsOrg(int(message.Chat.ID))
 		ctx = context.Background()
-		room, err := b.cache.RoomWhereUserIsOrg(ctx, int(message.Chat.ID))
+		user, err = b.cache.User(ctx, int(message.Chat.ID))
 		if err != nil {
 			return err
 		}
-		log.Printf("\nroom: %v\n", room)
-		// TODO: room должен быть -1, если юзер не организатор комнаты
-		if room == 0 {
+		//log.Printf("\nroom: %v\n", room)
+		if !user.IsOrganizer {
 			replyMsg := tgbotapi.NewMessage(message.Chat.ID, "Отлично! Теперь ждем, когда организатор начнет игру!")
-			_, err = b.bot.Send(replyMsg)
-			if err != nil {
+			if _, err = b.bot.Send(replyMsg); err != nil {
 				return err
 			}
 		} else {
@@ -242,16 +232,14 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 			}
 			k := tgbotapi.NewInlineKeyboardMarkup(btns)
 			replyMsg.ReplyMarkup = k
-			_, err = b.bot.Send(replyMsg)
-			if err != nil {
+			if _, err = b.bot.Send(replyMsg); err != nil {
 				return err
 			}
 		}
 	}
 
 	if msg.Text != message.Text {
-		_, err = b.bot.Send(msg)
-		if err != nil {
+		if _, err = b.bot.Send(msg); err != nil {
 			return err
 		}
 	}

@@ -18,6 +18,7 @@ type Storager interface {
 	UsersFromRoom(roomID int) ([]models.User, error)
 	RoomWhereUserIsOrg(userID int) (int, error)
 	AddWish(roomID, userID int, wish string) error
+	Wish(roomID, userID int) (string, error)
 }
 
 func NewStorage(cfg *configs.Config) (Storager, error) {

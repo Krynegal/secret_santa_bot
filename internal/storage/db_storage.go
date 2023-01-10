@@ -53,11 +53,21 @@ func (db *DB) CreateRoom(roomID int) error {
 }
 
 func (db *DB) AddWish(roomID, userID int, wish string) error {
-	_, err := db.db.Exec("INSERT INTO id_room_id_user (wishlist) VALUES ($1) WHERE id_room = ($2) AND id_room = ($3);", wish, userID, roomID)
+	_, err := db.db.Exec("UPDATE id_room_id_user SET wishlist = ($1) WHERE id_user = ($2) AND id_room = ($3);", wish, userID, roomID)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (db *DB) Wish(roomID, userID int) (string, error) {
+	row := db.db.QueryRow(`SELECT id_room_id_user.wishlist FROM id_room_id_user WHERE id_user = ($1) AND id_room = ($2));`, userID, roomID)
+	var wish string
+	err := row.Scan(&wish)
+	if err != nil {
+		return "", err
+	}
+	return wish, nil
 }
 
 func (db *DB) AssignRoomToUser(roomID, userID int, isOrganizer bool) error {
