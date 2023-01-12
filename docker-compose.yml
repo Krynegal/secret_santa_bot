@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  bot:
+    build: ./
+    command: ./wait-for-postgres.sh db ./secretSanta
+    depends_on:
+      - db
+      - cache
+    environment:
+      - DB_PASS=postgres
+    env_file:
+      - .env
+  db:
+    restart: always
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - .env
+  cache:
+    restart: always
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      - .env
