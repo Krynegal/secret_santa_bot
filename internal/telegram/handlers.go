@@ -95,7 +95,8 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 			shuffledUsers := shuffleUsers(roomUsers)
 			log.Printf("shuffledUsers: %v", shuffledUsers)
 			for giver, getter := range shuffledUsers {
-				wishlist, err := b.storage.Wish(roomID, getter.ID)
+				var wishlist string
+				wishlist, err = b.storage.Wish(roomID, getter.ID)
 				if err != nil {
 					return err
 				}
@@ -184,12 +185,12 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) error {
 		log.Printf("entered roomID: %s", msg.Text)
 		keyboard := tgbotapi.NewRemoveKeyboard(true)
 		msg.ReplyMarkup = keyboard
-		roomID, err := strconv.Atoi(msg.Text)
+		var roomID int
+		roomID, err = strconv.Atoi(msg.Text)
 		if err != nil {
 			return err
 		}
-
-		if err := b.cache.AddUser(ctx, int(message.Chat.ID), models.CacheNote{RoomID: roomID, IsOrganizer: false}); err != nil {
+		if err = b.cache.AddUser(ctx, int(message.Chat.ID), models.CacheNote{RoomID: roomID, IsOrganizer: false}); err != nil {
 			return err
 		}
 		err = b.storage.AssignRoomToUser(roomID, int(message.Chat.ID), false)
