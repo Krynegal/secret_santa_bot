@@ -17,8 +17,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) error {
 	chatID := query.Message.Chat.ID
 	switch query.Data {
 	case "create":
-		//roomID := generateRoomID()
-		roomID := 1234
+		roomID := generateRoomID()
 		if err := b.storage.CreateRoom(roomID); err != nil {
 			return err
 		}
